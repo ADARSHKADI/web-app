@@ -346,54 +346,6 @@ Save Marks
 
 </div>
 
-<!-- LOCKED MODAL -->
-
-<div class="modal fade" id="lockedModal">
-
-<div class="modal-dialog modal-dialog-centered">
-
-<div class="modal-content">
-
-<div class="modal-header bg-warning">
-
-<h5 class="modal-title">Subject Locked</h5>
-
-<button class="btn-close" data-bs-dismiss="modal"></button>
-
-</div>
-
-<div class="modal-body text-center">
-
-<h5 class="text-danger">
-
-આ વિષયની માર્કસ એન્ટ્રી પહેલા પૂર્ણ કરેલ છે.
-
-</h5>
-
-<p>
-
-તમે ફક્ત એન્ટ્રી કરેલ માર્કસ જોઈ શકશો. Edit કરી શકાય નહી.
-
-</p>
-
-</div>
-
-<div class="modal-footer">
-
-<button class="btn btn-primary" data-bs-dismiss="modal">
-
-OK
-
-</button>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
 <!-- SUCCESS ENTRY MODAL -->
 
 <div class="modal fade" id="successModal">
@@ -507,7 +459,7 @@ return;
 
 showLoader();
 
-fetch(API+"?action=login&code="+code+"&pass="+pass)
+fetch(API+"?action=login&code="+encodeURIComponent(code)+"&pass="+encodeURIComponent(pass))
 .then(res=>res.json())
 .then(res=>{
 
@@ -572,7 +524,7 @@ if(std=="")return;
 
 showLoader();
 
-fetch(API+"?action=getClass&std="+std)
+fetch(API+"?action=getClass&std="+encodeURIComponent(std))
 .then(res=>res.json())
 .then(data=>{
 
@@ -606,7 +558,7 @@ if(sheet=="")return;
 
 showLoader();
 
-fetch(API+"?action=getSubjects&sheet="+sheet)
+fetch(API+"?action=getSubjects&sheet="+encodeURIComponent(sheet))
 .then(res=>res.json())
 .then(data=>{
 
@@ -635,153 +587,157 @@ sub.appendChild(op);
 
 function loadStudents(){
 
-document.getElementById("principalSection").style.display="none";
-var sheet=document.getElementById("class").value;
-var subject=document.getElementById("subject").value;
+  document.getElementById("principalSection").style.display="none";
 
-if(subject=="")return;
+  var sheet=document.getElementById("class").value;
+  var subject=document.getElementById("subject").value;
+  if(subject=="") return;
 
-var subjectText=document.getElementById("subject").selectedOptions[0].text;
+  showLoader();
 
-var locked=subjectText.includes("✓");
+  fetch(API+"?action=getStudents&sheet="+encodeURIComponent(sheet))
+    .then(res=>res.json())
+    .then(data=>{
 
-if(locked){
-new bootstrap.Modal(document.getElementById('lockedModal')).show();
-}
+      hideLoader();
 
-showLoader();
+      if(!Array.isArray(data) || data.length===0){
+        document.getElementById("marksArea").innerHTML=
+          '<div class="alert alert-danger">વિદ્યાર્થીઓનો ડેટા મળ્યો નથી.</div>';
+        document.getElementById("saveBtn").classList.add("d-none");
+        return;
+      }
 
-fetch(API+"?action=getStudents&sheet="+sheet)
-.then(res=>res.json())
-.then(data=>{
+      var subjectIndex=data[0].indexOf(subject);
+      if(subjectIndex < 0){
+        document.getElementById("marksArea").innerHTML=
+          '<div class="alert alert-danger">વિષય Sheet માં મળ્યો નથી.</div>';
+        document.getElementById("saveBtn").classList.add("d-none");
+        return;
+      }
 
-hideLoader();
+      var html='<div class="card"><div class="card-body">';
+      html+='<div class="alert alert-info py-2">જૂના Marks દેખાશે. જરૂર મુજબ સુધારીને ફરીથી Save કરી શકો છો.</div>';
 
-var subjectIndex=0;
+      for(var i=1;i<data.length;i++){
+        var roll=data[i][0];
+        var name=data[i][1];
+        var status=data[i][2];
+        var marks=data[i][subjectIndex];
 
-for(var i=0;i<data[0].length;i++){
-if(data[0][i]==subject){
-subjectIndex=i;
-}
-}
+        // Timestamp / Teacher rows are skipped because they have no roll number.
+        if(roll==="" || roll===null) continue;
 
-var html='<div class="card"><div class="card-body">';
+        if(String(status).toLowerCase()==="left"){
+          html+=`
+            <div class="row student-row">
+              <div class="col-2 fw-bold">${roll}</div>
+              <div class="col-4">${name ?? ""}</div>
+              <div class="col-6">
+                <input class="form-control leftBox" value="LEFT STUDENT" disabled>
+              </div>
+            </div>`;
+        }else{
+          var safeMarks=(marks===null || marks===undefined) ? "" : marks;
+          html+=`
+            <div class="row student-row">
+              <div class="col-2 fw-bold">${roll}</div>
+              <div class="col-4">${name ?? ""}</div>
+              <div class="col-6">
+                <input type="number" class="form-control markInput"
+                  value="${safeMarks}" data-roll="${roll}"
+                  min="0" max="100" step="1" inputmode="numeric">
+              </div>
+            </div>`;
+        }
+      }
 
-for(var i=1;i<data.length;i++){
+      html+='</div></div>';
+      document.getElementById("marksArea").innerHTML=html;
+      document.getElementById("saveBtn").classList.remove("d-none");
 
-var roll=data[i][0];
-var name=data[i][1];
-var status=data[i][2];
-var marks=data[i][subjectIndex];
-
-if(!roll)continue;
-
-if(status=="Left"){
-
-html+=`
-<div class="row student-row">
-<div class="col-2 fw-bold">${roll}</div>
-<div class="col-4">${name}</div>
-<div class="col-6">
-<input class="form-control leftBox" value="LEFT STUDENT" disabled>
-</div>
-</div>`;
-
-}else{
-
-html+=`
-<div class="row student-row">
-<div class="col-2 fw-bold">${roll}</div>
-<div class="col-4">${name}</div>
-<div class="col-6">
-<input type="number" class="form-control markInput" value="${marks ?? ""}" data-roll="${roll}" min="0" max="100" inputmode="numeric" ${locked?"disabled":""}>
-</div>
-</div>`;
-
-}
-
-}
-
-html+='</div></div>';
-
-document.getElementById("marksArea").innerHTML=html;
-
-document.getElementById("saveBtn").classList.toggle("d-none", locked);
-
-});
-
+    })
+    .catch(err=>{
+      hideLoader();
+      alert("વિદ્યાર્થીઓનો ડેટા લોડ કરવામાં ભૂલ: "+err.message);
+    });
 }
 
 /* SAVE */
 
 function saveMarks(){
 
-var inputs=document.querySelectorAll("#marksArea input");
+  var inputs=document.querySelectorAll("#marksArea input.markInput");
 
-for(var i=0;i<inputs.length;i++){
+  if(inputs.length===0){
+    alert("માર્ક્સ એન્ટ્રી માટે કોઈ વિદ્યાર્થી મળ્યો નથી.");
+    return;
+  }
 
-if(!inputs[i].disabled){
+  for(var i=0;i<inputs.length;i++){
+    var val=inputs[i].value;
+    if(val==="" || Number(val)<0 || Number(val)>100){
+      alert("ગેરહાજર વિદ્યાર્થીના ખાનામાં 0 લખવું. કોઈ ખાનું ખાલી છોડવું નહિ.");
+      inputs[i].focus();
+      return;
+    }
+  }
 
-var val=inputs[i].value;
+  var sheet=document.getElementById("class").value;
+  var subject=document.getElementById("subject").value;
+  var data=[];
 
-if(val==""||val<0||val>100){
-alert("ગેરહાજર વિદ્યાર્થીના ખાનામાં 0 લખવું. કોઈ ખાનું ખાલી છોડવું નહિ.");
-inputs[i].focus();
-return;
-}
+  inputs.forEach(function(input){
+    data.push({
+      roll: input.dataset.roll,
+      marks: input.value
+    });
+  });
 
-}
+  showLoader();
+  document.getElementById("saveBtn").disabled=true;
 
-}
+  fetch(API,{
+    method:"POST",
+    body:JSON.stringify({
+      action:"saveMarks",
+      sheet:sheet,
+      subject:subject,
+      data:data,
+      teacher:teacherName
+    })
+  })
+  .then(res=>res.json())
+  .then(res=>{
 
-showLoader();
+    hideLoader();
+    document.getElementById("saveBtn").disabled=false;
 
-var sheet=document.getElementById("class").value;
-var subject=document.getElementById("subject").value;
+    if(!res || res.status!==true){
+      alert((res && res.message) ? res.message : "Marks save કરવામાં ભૂલ થઈ.");
+      return;
+    }
 
-var data=[];
+    var timeString=new Date().toLocaleString();
 
-inputs.forEach(function(input){
-data.push({
-roll:Number(input.dataset?.roll||0),
-marks:input.value
-});
-});
+    document.getElementById("mTeacher").innerText=teacherName;
+    document.getElementById("mStd").innerText=document.getElementById("std").value;
+    document.getElementById("mClass").innerText=document.getElementById("class").value;
+    document.getElementById("mSubject").innerText=subject;
+    document.getElementById("mTime").innerText=timeString;
 
-fetch(API,{
-method:"POST",
-body:JSON.stringify({
-action:"saveMarks",
-sheet:sheet,
-subject:subject,
-data:data,
-teacher:teacherName
-})
-}).then(()=>{
+    new bootstrap.Modal(document.getElementById("successModal")).show();
 
-hideLoader();
-// current time
-var now = new Date();
-var timeString = now.toLocaleString();
+    // Keep the selected subject active and show its Done tick.
+    var selectedSubject=document.getElementById("subject").selectedOptions[0];
+    if(selectedSubject) selectedSubject.text=subject+" ✓";
 
-// modal me data set karo
-document.getElementById("mTeacher").innerText = teacherName;
-document.getElementById("mStd").innerText = document.getElementById("std").value;
-document.getElementById("mClass").innerText = document.getElementById("class").value;
-document.getElementById("mSubject").innerText = document.getElementById("subject").value;
-document.getElementById("mTime").innerText = timeString;
-
-// modal show karo
-new bootstrap.Modal(document.getElementById('successModal')).show();
-
-// data reset
-document.getElementById("marksArea").innerHTML="";
-document.getElementById("saveBtn").classList.add("d-none");
-
-loadSubjects();
-
-});
-
+  })
+  .catch(err=>{
+    hideLoader();
+    document.getElementById("saveBtn").disabled=false;
+    alert("Connection / Save Error: "+err.message);
+  });
 }
 
 /* PASSWORD */
